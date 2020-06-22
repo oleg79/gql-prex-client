@@ -150,6 +150,7 @@ const App = () => {
           ))}
           <Button variant='contained' color='primary' onClick={handleClick}>
             <AddIcon />
+            <AddIcon />
           </Button>
           <Menu
             id="simple-menu"
