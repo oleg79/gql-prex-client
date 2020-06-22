@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/gql-presentation.iml" filepath="$PROJECT_DIR$/.idea/gql-presentation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../gql-prex-client/.idea/gql-prex-client.iml" filepath="$PROJECT_DIR$/../gql-prex-client/.idea/gql-prex-client.iml" />
     </modules>
   </component>
 </project>
