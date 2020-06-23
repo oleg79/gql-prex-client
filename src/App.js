@@ -27,6 +27,18 @@ import TextField from '@material-ui/core/TextField';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 
+import {gql} from 'apollo-boost';
+import { useQuery } from '@apollo/react-hooks';
+
+
+
+
+
+const Result = ({query}) => {
+  const { loading, error, data } = useQuery(gql(query));
+  console.log(loading, error, data)
+  return null;
+};
 
 const theme = createMuiTheme({
   palette: {
@@ -47,38 +59,39 @@ const QueryInput = styled(Paper)`
 `;
 
 const getIcon = (type) => ({
-  school: <SchoolIcon/>,
-  group: <PeopleOutlineIcon/>,
-  teacher: <FaceIcon/>,
-  student: <ChildCareIcon/>,
+  schools: <SchoolIcon/>,
+  groups: <PeopleOutlineIcon/>,
+  teachers: <FaceIcon/>,
+  students: <ChildCareIcon/>,
 })[type];
 
 const schoolFields = ['id', 'name'];
 const groupFields = ['id', 'name'];
-const teacherFields = ['id', 'firstName', 'lastName', 'userName']
-const studentFields = ['id', 'firstName', 'lastName', 'userName']
+const teacherFields = ['id', 'firstName', 'lastName', 'username']
+const studentFields = ['id', 'firstName', 'lastName', 'username']
 
 const schoolFilters = ['id', 'name'];
 const groupFilters = ['id', 'name'];
-const teacherFilters = ['id', 'firstName', 'lastName', 'userName']
-const studentFilters = ['id', 'firstName', 'lastName', 'userName']
+const teacherFilters = ['id', 'firstName', 'lastName', 'username']
+const studentFilters = ['id', 'firstName', 'lastName', 'username']
 
 const getFields = (type) => ({
-  school: schoolFields,
-  group: groupFields,
-  teacher: teacherFields,
-  student: studentFields,
+  schools: schoolFields,
+  groups: groupFields,
+  teachers: teacherFields,
+  students: studentFields,
 })[type];
 
 const getFilters = (type) => ({
-  school: schoolFilters,
-  group: groupFilters,
-  teacher: teacherFilters,
-  student: studentFilters,
+  schools: schoolFilters,
+  groups: groupFilters,
+  teachers: teacherFilters,
+  students: studentFilters,
 })[type];
 
 const App = () => {
 
+  const [query, setQuery] = React.useState(null);
   const [querySet, setQuerySet] = React.useState([]);
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [selectedQueryItem, setSelectedQueryItem] = React.useState(null);
@@ -121,6 +134,17 @@ const App = () => {
     setFilters(new Map(filters));
   };
 
+  const buildQuery = () => {
+    const x = querySet.reduce((q, chunck) => {
+      const {id, type} = chunck;
+      const f = [...fields.get(id).filter(([_, v]) => v).map(([v]) => v), '_PL_'];
+
+      return q.replace('_PL_', `${type} {${f.join(' ')}}`)
+    }, '{_PL_}').replace('_PL_', '');
+
+    setQuery(x);
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline/>
@@ -158,8 +182,8 @@ const App = () => {
             open={Boolean(anchorEl)}
             onClose={handleClose}
           >
-            { querySet[querySet.length - 1]?.type !== 'school' &&
-              <MenuItem onClick={addQuery('school')}>
+            { querySet[querySet.length - 1]?.type !== 'schools' &&
+              <MenuItem onClick={addQuery('schools')}>
                 <ListItemIcon>
                   <SchoolIcon/>
                 </ListItemIcon>
@@ -169,8 +193,8 @@ const App = () => {
               </MenuItem>
             }
 
-            { querySet[querySet.length - 1]?.type !== 'group' &&
-              <MenuItem onClick={addQuery('group')}>
+            { querySet[querySet.length - 1]?.type !== 'groups' &&
+              <MenuItem onClick={addQuery('groups')}>
                 <ListItemIcon>
                   <PeopleOutlineIcon/>
                 </ListItemIcon>
@@ -180,8 +204,8 @@ const App = () => {
               </MenuItem>
             }
 
-            { querySet[querySet.length - 1]?.type !== 'teacher' &&
-              <MenuItem onClick={addQuery('teacher')}>
+            { querySet[querySet.length - 1]?.type !== 'teachers' &&
+              <MenuItem onClick={addQuery('teachers')}>
                 <ListItemIcon>
                   <FaceIcon/>
                 </ListItemIcon>
@@ -191,8 +215,8 @@ const App = () => {
               </MenuItem>
             }
 
-            { querySet[querySet.length - 1]?.type !== 'student' &&
-              <MenuItem onClick={addQuery('student')}>
+            { querySet[querySet.length - 1]?.type !== 'students' &&
+              <MenuItem onClick={addQuery('students')}>
                 <ListItemIcon>
                   <ChildCareIcon/>
                 </ListItemIcon>
@@ -275,6 +299,8 @@ const App = () => {
             </Grid>
           </Paper>
         }
+        <Button onClick={buildQuery}>CHECK</Button>
+        {query && <Result query={query}/>}
       </StyledContainer>
     </ThemeProvider>
   );
