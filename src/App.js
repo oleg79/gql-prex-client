@@ -28,9 +28,11 @@ import TextField from '@material-ui/core/TextField';
 import Toolbar from '@material-ui/core/Toolbar';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
-import Divider from '@material-ui/core/Divider';
 import ListItemAvatar from '@material-ui/core/ListItemAvatar';
 import Avatar from '@material-ui/core/Avatar';
+import Collapse from '@material-ui/core/Collapse';
+import ExpandLess from '@material-ui/icons/ExpandLess';
+import ExpandMore from '@material-ui/icons/ExpandMore';
 
 import {gql} from 'apollo-boost';
 import { useQuery } from '@apollo/react-hooks';
@@ -103,15 +105,6 @@ const sanitizeType = (previous, current) => ({
   }
 })[previous]?.[current] ?? current;
 
-
-function resolvePath(querySet) {
-  return querySet.reduce((path, {type}) => {
-    const sanitizedType = sanitizeType(resolvePath.previousType, type);
-    resolvePath.previousType = type;
-    return [...path, sanitizedType];
-  }, []);
-}
-
 const getSanitizedPath = (querySet) => new Map(querySet.reduce((sqs, {id, type}) => {
   if (sqs.length) {
     const prev = sqs[sqs.length - 1];
@@ -137,6 +130,78 @@ const buildQuery = (querySet, fields, filters) => {
   }, '{_PL_}').replace('_PL_', '');
 }
 
+const useNestedListStyles = makeStyles((theme) => ({
+  root: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.palette.background.paper,
+  },
+  nested: {
+    paddingLeft: theme.spacing(4),
+  },
+}));
+
+const Li = styled.div`
+  display: flex;
+  flex-direction: column;
+  padding-left: 10px;
+`;
+
+const More = styled.div`
+  //flex-grow: 3;
+`;
+
+const MyInfo = styled.div`
+  display: flex;
+  flex-direction: row;
+`;
+
+const NestedList = ({data}) => {
+  const classes = useNestedListStyles();
+  const [open, setOpen] = React.useState(false);
+
+  const handleClick = () => {
+    setOpen(!open);
+  };
+
+  return (
+    <List
+      component="nav"
+      aria-labelledby="nested-list-subheader"
+      subheader={
+        <ListSubheader component="div" id="nested-list-subheader">
+          Nested Result
+        </ListSubheader>
+      }
+      className={classes.root}
+    >
+      {data.map((item, id) => (
+        <Li key={id}>
+          {Object.entries(item).filter(([k]) => k !== '__typename').map(([key, val], i) => {
+            const safeVal = !Array.isArray(val) && typeof val === 'object' ? [val] : val;
+            return (
+              Array.isArray(safeVal)
+                ?
+                <More key={i}>
+                  <ListItem button onClick={handleClick}>
+                    <ListItemText primary="More" />
+                    {open ? <ExpandLess /> : <ExpandMore />}
+                  </ListItem>
+                  <Collapse in={open} timeout="auto" unmountOnExit>
+                    <NestedList data={safeVal} />
+                  </Collapse>
+                </More>
+                : <MyInfo key={i}>
+                  <div><span>{key}</span> - <span>{safeVal}</span></div>
+                </MyInfo>
+            );
+          })}
+        </Li>
+      ))}
+    </List>
+  );
+};
+
 const Result = ({query, path, isNested}) => {
   const { loading, error, data } = useQuery(gql(query));
 
@@ -149,14 +214,15 @@ const Result = ({query, path, isNested}) => {
   }
 
   if (data) {
-    if (isNested) {
+    const rootData = data[path[0]];
 
+    if (isNested) {
+      return <NestedList data={rootData}/>;
     } else {
       const flattenData = [...new Set(path.slice(1).reduce((d, p) => {
         const pl = ['schools', 'groups', 'teachers', 'students'];
-        console.log(d, p);
         return d[pl.includes(p) ? 'flatMap' : 'map'](x => x[p]);
-      }, data[path[0]]))]
+      }, rootData))]
 
       return (
         <List
@@ -169,7 +235,7 @@ const Result = ({query, path, isNested}) => {
           {flattenData.map((item, i) => (
             <ListItem key={i} alignItems="flex-start">
               <ListItemAvatar>
-                <Avatar alt="Remy Sharp" src="https://via.placeholder.com/300.png/09f/fff" />
+                <Avatar src="https://via.placeholder.com/300.png/09f/fff" />
               </ListItemAvatar>
               <ListItemText
                 primary={item.name || item.username}
@@ -178,7 +244,6 @@ const Result = ({query, path, isNested}) => {
                     <Typography
                       component="span"
                       variant="body2"
-                      // className={classes.inline}
                       color="textPrimary"
                     >
                       {item.firstName} {item.lastName} {!item.firstName && !item.lastName ? 'no additional info' : ''}
@@ -255,12 +320,15 @@ const App = () => {
         <AppBar position='static'>
           <Toolbar variant='dense'>
             <Typography variant='h6' color='inherit' className={classes.title}>
-              GLUi - GLU lil' GraphQL Brother 👶
+              GLUi - GLU lil' ugly GraphQL Brother 👶 👹
             </Typography>
             <Tooltip title='nested result' placement='left' arrow>
               <Switch
                 checked={nestedResult}
-                onChange={() => setNestedResult(v => !v)}
+                onChange={() => {
+                  setNestedResult(v => !v);
+                  setQuery(null);
+                }}
                 name="checkedA"
                 inputProps={{ 'aria-label': 'secondary checkbox' }}
               />
