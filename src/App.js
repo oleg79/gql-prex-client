@@ -29,9 +29,7 @@ import Typography from '@material-ui/core/Typography';
 
 import {gql} from 'apollo-boost';
 import { useQuery } from '@apollo/react-hooks';
-
-
-
+import orange from "@material-ui/core/colors/orange";
 
 
 const Result = ({query}) => {
@@ -59,10 +57,10 @@ const QueryInput = styled(Paper)`
 `;
 
 const getIcon = (type) => ({
-  schools: <SchoolIcon/>,
-  groups: <PeopleOutlineIcon/>,
-  teachers: <FaceIcon/>,
-  students: <ChildCareIcon/>,
+  schools: <SchoolIcon style={{ color: orange[400] }}/>,
+  groups: <PeopleOutlineIcon style={{ color: orange[400] }}/>,
+  teachers: <FaceIcon style={{ color: orange[400] }}/>,
+  students: <ChildCareIcon style={{ color: orange[400] }}/>,
 })[type];
 
 const schoolFields = ['id', 'name'];
@@ -88,6 +86,28 @@ const getFilters = (type) => ({
   teachers: teacherFilters,
   students: studentFilters,
 })[type];
+
+
+const sanitizeType = (previous, current) => ({
+  students: {
+    schools: 'school'
+  },
+  groups: {
+    schools: 'school'
+  }
+})[previous]?.[current] ?? current;
+
+
+function buildQuery (querySet, fields, filters) {
+  return querySet.reduce((q, chunk) => {
+    const {id, type} = chunk;
+    const sanitizedType = sanitizeType(buildQuery.previousType, type);
+    const f = [...fields.get(id).filter(([_, v]) => v).map(([v]) => v), '_PL_'];
+
+    buildQuery.previousType = type;
+    return q.replace('_PL_', `${sanitizedType} {${f.join(' ')}}`)
+  }, '{_PL_}').replace('_PL_', '');
+}
 
 const App = () => {
 
@@ -134,15 +154,10 @@ const App = () => {
     setFilters(new Map(filters));
   };
 
-  const buildQuery = () => {
-    const x = querySet.reduce((q, chunck) => {
-      const {id, type} = chunck;
-      const f = [...fields.get(id).filter(([_, v]) => v).map(([v]) => v), '_PL_'];
+  const performQuery = () => {
+    const q = buildQuery(querySet, fields)
 
-      return q.replace('_PL_', `${type} {${f.join(' ')}}`)
-    }, '{_PL_}').replace('_PL_', '');
-
-    setQuery(x);
+    setQuery(q);
   }
 
   return (
@@ -151,7 +166,7 @@ const App = () => {
       <StyledContainer fixed>
         <AppBar position='static'>
           <Toolbar variant='dense'>
-            <Typography variant='h6' color='inherit'>GLUi - GLU GraphQL lil' Brother 👶</Typography>
+            <Typography variant='h6' color='inherit'>GLUi - GLU cool'n'ugly lil' GraphQL Brother 👶</Typography>
           </Toolbar>
         </AppBar>
         <QueryInput>
@@ -299,7 +314,7 @@ const App = () => {
             </Grid>
           </Paper>
         }
-        <Button onClick={buildQuery}>CHECK</Button>
+        <Button onClick={performQuery}>CHECK</Button>
         {query && <Result query={query}/>}
       </StyledContainer>
     </ThemeProvider>
