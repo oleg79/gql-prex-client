@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { v4 as uuidv4 } from 'uuid';
-import { createMuiTheme, ThemeProvider } from '@material-ui/core/styles';
+import { createMuiTheme, makeStyles, ThemeProvider } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
 import AddIcon from '@material-ui/icons/Add';
 import Button from '@material-ui/core/Button';
@@ -23,20 +23,25 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Paper from '@material-ui/core/Paper';
 import PeopleOutlineIcon from '@material-ui/icons/PeopleOutline';
 import SchoolIcon from '@material-ui/icons/School';
+import Switch from '@material-ui/core/Switch';
 import TextField from '@material-ui/core/TextField';
 import Toolbar from '@material-ui/core/Toolbar';
+import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
+import Divider from '@material-ui/core/Divider';
+import ListItemAvatar from '@material-ui/core/ListItemAvatar';
+import Avatar from '@material-ui/core/Avatar';
 
 import {gql} from 'apollo-boost';
 import { useQuery } from '@apollo/react-hooks';
 import orange from "@material-ui/core/colors/orange";
 
+const useStyles = makeStyles(() => ({
+  title: {
+    flexGrow: 1,
+  },
+}));
 
-const Result = ({query}) => {
-  const { loading, error, data } = useQuery(gql(query));
-  console.log(loading, error, data)
-  return null;
-};
 
 const theme = createMuiTheme({
   palette: {
@@ -54,6 +59,7 @@ const QueryInput = styled(Paper)`
   flex-wrap: wrap;
   margin: 0;
   padding: 5px;
+  align-items: center;
 `;
 
 const getIcon = (type) => ({
@@ -98,22 +104,103 @@ const sanitizeType = (previous, current) => ({
 })[previous]?.[current] ?? current;
 
 
-function buildQuery (querySet, fields, filters) {
-  return querySet.reduce((q, {id, type}) => {
-    const sanitizedType = sanitizeType(buildQuery.previousType, type);
+function resolvePath(querySet) {
+  return querySet.reduce((path, {type}) => {
+    const sanitizedType = sanitizeType(resolvePath.previousType, type);
+    resolvePath.previousType = type;
+    return [...path, sanitizedType];
+  }, []);
+}
+
+const getSanitizedPath = (querySet) => new Map(querySet.reduce((sqs, {id, type}) => {
+  if (sqs.length) {
+    const prev = sqs[sqs.length - 1];
+    const sanitizedType = sanitizeType(prev[1], type);
+
+    return [...sqs, [id, sanitizedType]];
+  }
+  return [...sqs, [id, type]]
+}, []));
+
+
+const buildQuery = (querySet, fields, filters) => {
+  const sanitizedPath = getSanitizedPath(querySet);
+
+  return querySet.reduce((q, {id}) => {
+    const sanitizedType = sanitizedPath.get(id);
     const f = [...fields.get(id).filter(([_, v]) => v).map(([v]) => v), '_PL_'];
 
     const qFilters = filters.get(id)
       .filter(([_, v]) => v).reduce((fs, [name, value]) => [...fs, `${name}: "${value}"`], []).join(', ')
 
-    buildQuery.previousType = type;
     return q.replace('_PL_', `${sanitizedType}${qFilters ? `(${qFilters})` : ''} {${f.join(' ')}}`)
   }, '{_PL_}').replace('_PL_', '');
 }
 
+const Result = ({query, path, isNested}) => {
+  const { loading, error, data } = useQuery(gql(query));
+
+  if (loading) {
+    return null;
+  }
+
+  if (error) {
+    return null;
+  }
+
+  if (data) {
+    if (isNested) {
+
+    } else {
+      const flattenData = [...new Set(path.slice(1).reduce((d, p) => {
+        const pl = ['schools', 'groups', 'teachers', 'students'];
+        console.log(d, p);
+        return d[pl.includes(p) ? 'flatMap' : 'map'](x => x[p]);
+      }, data[path[0]]))]
+
+      return (
+        <List
+          subheader={
+            <ListSubheader component="div" id="fields-subheader">
+              {path[path.length - 1]}
+            </ListSubheader>
+          }
+        >
+          {flattenData.map((item, i) => (
+            <ListItem key={i} alignItems="flex-start">
+              <ListItemAvatar>
+                <Avatar alt="Remy Sharp" src="https://via.placeholder.com/300.png/09f/fff" />
+              </ListItemAvatar>
+              <ListItemText
+                primary={item.name || item.username}
+                secondary={
+                  <React.Fragment>
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      // className={classes.inline}
+                      color="textPrimary"
+                    >
+                      {item.firstName} {item.lastName} {!item.firstName && !item.lastName ? 'no additional info' : ''}
+                    </Typography>
+                  </React.Fragment>
+                }
+              />
+            </ListItem>
+          ))}
+
+        </List>
+      );
+    }
+  }
+  return null;
+};
+
 const App = () => {
+  const classes = useStyles();
 
   const [query, setQuery] = React.useState(null);
+  const [nestedResult, setNestedResult] = React.useState(false);
   const [querySet, setQuerySet] = React.useState([]);
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [selectedQueryItem, setSelectedQueryItem] = React.useState(null);
@@ -134,12 +221,13 @@ const App = () => {
 
     setFields(fs => fs.set(id, getFields(type).map(f => [f, true])))
     setFilters(fs => fs.set(id, getFilters(type).map(f => [f, ''])))
-
+    setQuery(null);
     handleClose();
   };
 
   const deleteQueryItem = (id) => () => {
     setQuerySet(querySet => querySet.filter(q => q.id !== id));
+    setQuery(null);
   };
 
   const toggleField = (id, text) => () => {
@@ -166,7 +254,17 @@ const App = () => {
       <StyledContainer fixed>
         <AppBar position='static'>
           <Toolbar variant='dense'>
-            <Typography variant='h6' color='inherit'>GLUi - GLU cool'n'ugly lil' GraphQL Brother 👶</Typography>
+            <Typography variant='h6' color='inherit' className={classes.title}>
+              GLUi - GLU lil' GraphQL Brother 👶
+            </Typography>
+            <Tooltip title='nested result' placement='left' arrow>
+              <Switch
+                checked={nestedResult}
+                onChange={() => setNestedResult(v => !v)}
+                name="checkedA"
+                inputProps={{ 'aria-label': 'secondary checkbox' }}
+              />
+            </Tooltip>
           </Toolbar>
         </AppBar>
         <QueryInput>
@@ -314,8 +412,19 @@ const App = () => {
             </Grid>
           </Paper>
         }
-        <Button onClick={performQuery}>CHECK</Button>
-        {query && <Result query={query}/>}
+        <Grid container justify='center'>
+          <Button
+            variant='contained'
+            color='primary'
+            onClick={performQuery}
+            disabled={querySet.length === 0}
+          >search</Button>
+        </Grid>
+        {query && <Result
+          query={query}
+          path={Array.from(getSanitizedPath(querySet)).map(([_, path]) => path)}
+          isNested={nestedResult}
+        />}
       </StyledContainer>
     </ThemeProvider>
   );
