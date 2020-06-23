@@ -68,10 +68,10 @@ const groupFields = ['id', 'name'];
 const teacherFields = ['id', 'firstName', 'lastName', 'username']
 const studentFields = ['id', 'firstName', 'lastName', 'username']
 
-const schoolFilters = ['id', 'name'];
-const groupFilters = ['id', 'name'];
-const teacherFilters = ['id', 'firstName', 'lastName', 'username']
-const studentFilters = ['id', 'firstName', 'lastName', 'username']
+const schoolFilters = ['name'];
+const groupFilters = ['name'];
+const teacherFilters = ['firstName', 'lastName', 'username']
+const studentFilters = ['firstName', 'lastName', 'username']
 
 const getFields = (type) => ({
   schools: schoolFields,
@@ -99,13 +99,15 @@ const sanitizeType = (previous, current) => ({
 
 
 function buildQuery (querySet, fields, filters) {
-  return querySet.reduce((q, chunk) => {
-    const {id, type} = chunk;
+  return querySet.reduce((q, {id, type}) => {
     const sanitizedType = sanitizeType(buildQuery.previousType, type);
     const f = [...fields.get(id).filter(([_, v]) => v).map(([v]) => v), '_PL_'];
 
+    const qFilters = filters.get(id)
+      .filter(([_, v]) => v).reduce((fs, [name, value]) => [...fs, `${name}: "${value}"`], []).join(', ')
+
     buildQuery.previousType = type;
-    return q.replace('_PL_', `${sanitizedType} {${f.join(' ')}}`)
+    return q.replace('_PL_', `${sanitizedType}${qFilters ? `(${qFilters})` : ''} {${f.join(' ')}}`)
   }, '{_PL_}').replace('_PL_', '');
 }
 
@@ -155,9 +157,7 @@ const App = () => {
   };
 
   const performQuery = () => {
-    const q = buildQuery(querySet, fields)
-
-    setQuery(q);
+    setQuery(buildQuery(querySet, fields, filters));
   }
 
   return (
